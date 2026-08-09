@@ -8,7 +8,9 @@ import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,7 +33,7 @@ public class JWTHeaderKIDEndpointTest extends LessonTest {
   }
 
   @Test
-  public void solveAssignment() throws Exception {
+  public void sqlInjectionInKeyIdIsRejected() throws Exception {
     String key = "deletingTom";
     Map<String, Object> claims = new HashMap<>();
     claims.put("username", "Tom");
@@ -43,6 +45,25 @@ public class JWTHeaderKIDEndpointTest extends LessonTest {
             .setClaims(claims)
             .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, key)
             .compact();
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/JWT/kid/delete").param("token", token).content(""))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("jwt-invalid-token"))));
+  }
+
+  @Test
+  public void validTomTokenWithKnownKeyIdStillWorks() throws Exception {
+    Claims claims = Jwts.claims();
+    claims.put("username", "Tom");
+    String token =
+        Jwts.builder()
+            .setHeaderParam("kid", "webgoat_key")
+            .setClaims(claims)
+            .signWith(SignatureAlgorithm.HS512, "qwertyqwerty1234")
+            .compact();
+
     mockMvc
         .perform(MockMvcRequestBuilders.post("/JWT/kid/delete").param("token", token).content(""))
         .andExpect(status().isOk())
@@ -67,6 +88,23 @@ public class JWTHeaderKIDEndpointTest extends LessonTest {
             MockMvcRequestBuilders.post("/JWT/kid/delete")
                 .param("token", ".eyJ1c2VybmFtZSI6IlRvbSJ9.")
                 .content(""))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("jwt-invalid-token"))));
+  }
+
+  @Test
+  public void missingKeyIdIsRejected() throws Exception {
+    Claims claims = Jwts.claims();
+    claims.put("username", "Tom");
+    String token =
+        Jwts.builder()
+            .setClaims(claims)
+            .signWith(SignatureAlgorithm.HS512, "qwertyqwerty1234")
+            .compact();
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/JWT/kid/delete").param("token", token).content(""))
         .andExpect(status().isOk())
         .andExpect(
             jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("jwt-invalid-token"))));
