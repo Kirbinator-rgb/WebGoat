@@ -5,9 +5,6 @@
 package org.owasp.webgoat.lessons.missingac;
 
 import static org.owasp.webgoat.lessons.missingac.MissingFunctionAC.PASSWORD_SALT_ADMIN;
-import static org.owasp.webgoat.lessons.missingac.MissingFunctionAC.PASSWORD_SALT_SIMPLE;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
@@ -20,7 +17,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.ModelAndView;
 
 /** Created by jason on 1/5/17. */
 @Controller
@@ -31,31 +27,10 @@ public class MissingFunctionACUsers {
   private final MissingAccessControlUserRepository userRepository;
 
   @GetMapping(path = {"access-control/users"})
-  public ModelAndView listUsers() {
-
-    ModelAndView model = new ModelAndView();
-    model.setViewName("list_users");
-    List<User> allUsers = userRepository.findAllUsers();
-    model.addObject("numUsers", allUsers.size());
-    // add display user objects in place of direct users
-    List<DisplayUser> displayUsers = new ArrayList<>();
-    for (User user : allUsers) {
-      displayUsers.add(new DisplayUser(user, PASSWORD_SALT_SIMPLE));
-    }
-    model.addObject("allUsers", displayUsers);
-
-    return model;
-  }
-
-  @GetMapping(
-      path = {"access-control/users"},
-      consumes = "application/json")
   @ResponseBody
-  public ResponseEntity<List<DisplayUser>> usersService() {
-    return ResponseEntity.ok(
-        userRepository.findAllUsers().stream()
-            .map(user -> new DisplayUser(user, PASSWORD_SALT_SIMPLE))
-            .collect(Collectors.toList()));
+  public ResponseEntity<Void> usersService() {
+    // ASVS V4.1/V8.3: the legacy endpoint exposes no user records or derived credentials.
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
   }
 
   @GetMapping(

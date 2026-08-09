@@ -30,12 +30,20 @@ class MissingFunctionYourHashTest extends LessonTest {
   }
 
   @Test
-  void hashMatches() throws Exception {
+  void leakedLegacyHashNoLongerGrantsCompletion() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/access-control/user-hash")
                 .param("userHash", "SVtOlaa+ER+w2eoIIVE5/77umvhcsh5V8UyDLUa1Itg="))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+  }
+
+  @Test
+  void missingHashDoesNotCauseAnError() throws Exception {
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/access-control/user-hash"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 }
