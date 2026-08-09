@@ -4,13 +4,12 @@
  */
 package org.owasp.webgoat.lessons.hijacksession.cas;
 
-import java.time.Instant;
-import java.util.LinkedList;
+import java.security.SecureRandom;
+import java.util.ArrayDeque;
+import java.util.Base64;
 import java.util.Queue;
-import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoublePredicate;
-import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.ApplicationScope;
@@ -19,36 +18,32 @@ import org.springframework.web.context.annotation.ApplicationScope;
  * @author Angel Olle Blazquez
  */
 
-// weak id value and mechanism
-
 @ApplicationScope
 @Component
 public class HijackSessionAuthenticationProvider implements AuthenticationProvider<Authentication> {
 
-  private Queue<String> sessions = new LinkedList<>();
-  private static long id = new Random().nextLong() & Long.MAX_VALUE;
+  private static final int SESSION_ID_BYTES = 32;
   protected static final int MAX_SESSIONS = 50;
 
+  private final Queue<String> sessions = new ArrayDeque<>();
+  private final SecureRandom secureRandom = new SecureRandom();
+
   private static final DoublePredicate PROBABILITY_DOUBLE_PREDICATE = pr -> pr < 0.75;
-  private static final Supplier<String> GENERATE_SESSION_ID =
-      () -> ++id + "-" + Instant.now().toEpochMilli();
-  public static final Supplier<Authentication> AUTHENTICATION_SUPPLIER =
-      () -> Authentication.builder().id(GENERATE_SESSION_ID.get()).build();
 
   @Override
   public Authentication authenticate(Authentication authentication) {
     if (authentication == null) {
-      return AUTHENTICATION_SUPPLIER.get();
+      return newAuthentication();
     }
 
     if (StringUtils.isNotEmpty(authentication.getId())
-        && sessions.contains(authentication.getId())) {
+        && containsSession(authentication.getId())) {
       authentication.setAuthenticated(true);
       return authentication;
     }
 
     if (StringUtils.isEmpty(authentication.getId())) {
-      authentication.setId(GENERATE_SESSION_ID.get());
+      authentication.setId(generateSessionId());
     }
 
     authorizedUserAutoLogin();
@@ -58,20 +53,38 @@ public class HijackSessionAuthenticationProvider implements AuthenticationProvid
 
   protected void authorizedUserAutoLogin() {
     if (!PROBABILITY_DOUBLE_PREDICATE.test(ThreadLocalRandom.current().nextDouble())) {
-      Authentication authentication = AUTHENTICATION_SUPPLIER.get();
+      Authentication authentication = newAuthentication();
       authentication.setAuthenticated(true);
       addSession(authentication.getId());
     }
   }
 
-  protected boolean addSession(String sessionId) {
+  protected synchronized boolean addSession(String sessionId) {
+    if (StringUtils.isBlank(sessionId)) {
+      return false;
+    }
     if (sessions.size() >= MAX_SESSIONS) {
       sessions.remove();
     }
     return sessions.add(sessionId);
   }
 
-  protected int getSessionsSize() {
+  protected synchronized int getSessionsSize() {
     return sessions.size();
+  }
+
+  private synchronized boolean containsSession(String sessionId) {
+    return sessions.contains(sessionId);
+  }
+
+  private Authentication newAuthentication() {
+    return Authentication.builder().id(generateSessionId()).build();
+  }
+
+  private String generateSessionId() {
+    // ASVS V7.2/V11.5: session identifiers require at least 128 bits from a CSPRNG.
+    byte[] randomBytes = new byte[SESSION_ID_BYTES];
+    secureRandom.nextBytes(randomBytes);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
   }
 }

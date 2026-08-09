@@ -19,6 +19,7 @@ import org.owasp.webgoat.lessons.hijacksession.cas.Authentication;
 import org.owasp.webgoat.lessons.hijacksession.cas.HijackSessionAuthenticationProvider;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 /***
@@ -69,5 +70,13 @@ class HijackSessionAssignmentTest extends LessonTest {
 
     result.andExpect(cookie().value(COOKIE_NAME, not(emptyString())));
     result.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+
+    MvcResult mvcResult = result.andReturn();
+    Cookie responseCookie = mvcResult.getResponse().getCookie(COOKIE_NAME);
+    org.assertj.core.api.Assertions.assertThat(responseCookie).isNotNull();
+    org.assertj.core.api.Assertions.assertThat(responseCookie.getSecure()).isTrue();
+    org.assertj.core.api.Assertions.assertThat(responseCookie.isHttpOnly()).isTrue();
+    org.assertj.core.api.Assertions.assertThat(responseCookie.getAttribute("SameSite"))
+        .isEqualTo("Strict");
   }
 }

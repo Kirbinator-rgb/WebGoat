@@ -8,6 +8,8 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.DisplayName;
@@ -91,10 +93,23 @@ class HijackSessionAuthenticationProviderTest {
   void testMaxSessions() {
     for (int i = 0; i <= HijackSessionAuthenticationProvider.MAX_SESSIONS + 1; i++) {
       provider.authorizedUserAutoLogin();
-      provider.addSession(null);
+      provider.addSession("session-" + i);
     }
 
     assertThat(provider.getSessionsSize(), is(HijackSessionAuthenticationProvider.MAX_SESSIONS));
+  }
+
+  @Test
+  void generatesUniqueOpaqueSessionIdentifiers() {
+    Set<String> sessionIds = new HashSet<>();
+
+    for (int i = 0; i < 100; i++) {
+      String sessionId = provider.authenticate(null).getId();
+      assertThat(sessionId.matches("[A-Za-z0-9_-]{43}"), is(true));
+      sessionIds.add(sessionId);
+    }
+
+    assertThat(sessionIds.size(), is(100));
   }
 
   private static Stream<Arguments> authenticationForCookieValues() {
