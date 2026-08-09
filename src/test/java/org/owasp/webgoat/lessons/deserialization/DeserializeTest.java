@@ -5,10 +5,13 @@
 package org.owasp.webgoat.lessons.deserialization;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.dummy.insecure.framework.VulnerableTaskHolder;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.container.plugins.LessonTest;
@@ -16,42 +19,34 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 class DeserializeTest extends LessonTest {
 
-  private static String OS = System.getProperty("os.name").toLowerCase();
+  private static final class CallbackGadget implements Serializable {
 
-  @Test
-  void success() throws Exception {
-    if (OS.indexOf("win") > -1) {
-      mockMvc
-          .perform(
-              MockMvcRequestBuilders.post("/InsecureDeserialization/task")
-                  .param(
-                      "token",
-                      SerializationHelper.toString(
-                          new VulnerableTaskHolder("wait", "ping localhost -n 5"))))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.lessonCompleted", is(true)));
-    } else {
-      mockMvc
-          .perform(
-              MockMvcRequestBuilders.post("/InsecureDeserialization/task")
-                  .param(
-                      "token",
-                      SerializationHelper.toString(new VulnerableTaskHolder("wait", "sleep 5"))))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.lessonCompleted", is(true)));
+    private static final long serialVersionUID = 1L;
+    private static boolean callbackInvoked;
+
+    private void readObject(ObjectInputStream input) throws IOException, ClassNotFoundException {
+      callbackInvoked = true;
+      input.defaultReadObject();
     }
   }
 
   @Test
-  void fail() throws Exception {
+  void rejectsObjectBeforeDeserializationCallbackRuns() throws Exception {
+    CallbackGadget.callbackInvoked = false;
+
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/InsecureDeserialization/task")
                 .param(
-                    "token",
-                    SerializationHelper.toString(new VulnerableTaskHolder("delete", "rm *"))))
+                    "token", SerializationHelper.toString(new CallbackGadget())))
         .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.feedback",
+                CoreMatchers.is(messages.getMessage("insecure-deserialization.invalidversion"))))
         .andExpect(jsonPath("$.lessonCompleted", is(false)));
+
+    assertFalse(CallbackGadget.callbackInvoked);
   }
 
   @Test
@@ -78,7 +73,7 @@ class DeserializeTest extends LessonTest {
         .andExpect(
             jsonPath(
                 "$.feedback",
-                CoreMatchers.is(messages.getMessage("insecure-deserialization.expired"))))
+                CoreMatchers.is(messages.getMessage("insecure-deserialization.invalidversion"))))
         .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
