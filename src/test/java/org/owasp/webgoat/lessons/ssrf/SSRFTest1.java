@@ -38,7 +38,17 @@ public class SSRFTest1 extends LessonTest {
     mockMvc
         .perform(MockMvcRequestBuilders.post("/SSRF/task1").param("url", "images/jerry.png"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+  }
+
+  @Test
+  public void rejectsAbsoluteAndTraversalUrls() throws Exception {
+    for (String url : new String[] {"http://127.0.0.1/admin", "../images/jerry.png"}) {
+      mockMvc
+          .perform(MockMvcRequestBuilders.post("/SSRF/task1").param("url", url))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.lessonCompleted", is(false)));
+    }
   }
 
   @Test
