@@ -15,7 +15,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 public class DOMCrossSiteScriptingTest extends LessonTest {
 
   @Test
-  void success() throws Exception {
+  void phoneHomeParametersDoNotDiscloseACallbackValue() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/CrossSiteScripting/phone-home-xss")
@@ -23,7 +23,8 @@ public class DOMCrossSiteScriptingTest extends LessonTest {
                 .param("param1", "42")
                 .param("param2", "24"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)))
+        .andExpect(jsonPath("$.output", CoreMatchers.nullValue()));
   }
 
   @Test
