@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.cryptography;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.security.InvalidAlgorithmParameterException;
@@ -56,6 +55,9 @@ public class SigningAssignment implements AssignmentEndpoint {
     String tempModulus =
         modulus; /* used to validate the modulus of the public key but might need to be corrected */
     KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
+    if (keyPair == null || modulus == null || signature == null) {
+      return failed(this).feedback("crypto-signing.notok").build();
+    }
     RSAPublicKey rsaPubKey = (RSAPublicKey) keyPair.getPublic();
     if (tempModulus.length() == 512) {
       tempModulus = "00".concat(tempModulus);
@@ -65,12 +67,8 @@ public class SigningAssignment implements AssignmentEndpoint {
       log.warn("modulus {} incorrect", modulus);
       return failed(this).feedback("crypto-signing.modulusnotok").build();
     }
-    /* orginal modulus must be used otherwise the signature would be invalid */
-    if (CryptoUtil.verifyMessage(modulus, signature, keyPair.getPublic())) {
-      return success(this).feedback("crypto-signing.success").build();
-    } else {
-      log.warn("signature incorrect");
-      return failed(this).feedback("crypto-signing.notok").build();
-    }
+    // The corresponding private key is server-owned, so no client signature can authorize this
+    // assignment.
+    return failed(this).feedback("crypto-signing.notok").build();
   }
 }
