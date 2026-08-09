@@ -63,6 +63,17 @@ class SimpleXXETest extends LessonTest {
   }
 
   @Test
+  void directoryNamesWithoutExternalEntitiesCannotCompleteAssignment() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/xxe/simple")
+                .content("<comment><text>usr etc var Windows Program Files</text></comment>"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.not.solved"))));
+  }
+
+  @Test
   void postingPlainTextReturnsGenericFailure() throws Exception {
     mockMvc
         .perform(MockMvcRequestBuilders.post("/xxe/simple").content("test"))
