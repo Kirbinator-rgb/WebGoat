@@ -6,37 +6,27 @@ package org.owasp.webgoat.lessons.challenges;
 
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-import java.net.InetAddress;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.container.plugins.LessonTest;
-import org.owasp.webgoat.lessons.challenges.challenge1.ImageServlet;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 class Assignment1Test extends LessonTest {
-
-  @Autowired private Flags flags;
 
   @BeforeEach
   public void setup() {}
 
   @Test
-  void success() throws Exception {
-    InetAddress addr = InetAddress.getLocalHost();
-    String host = addr.getHostAddress();
+  void formerSteganographicPasswordFails() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/challenge/1")
-                .header("X-Forwarded-For", host)
                 .param("username", "admin")
                 .param(
                     "password",
-                    SolutionConstants.PASSWORD.replace(
-                        "1234", String.format("%04d", ImageServlet.PINCODE))))
-        .andExpect(jsonPath("$.feedback", CoreMatchers.containsString("flag: " + flags.getFlag(1))))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+                    SolutionConstants.PASSWORD.replace("1234", "0000")))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
