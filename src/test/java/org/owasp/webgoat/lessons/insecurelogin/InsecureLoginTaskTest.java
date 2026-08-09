@@ -13,8 +13,8 @@ class InsecureLoginTaskTest {
   private final InsecureLoginTask task = new InsecureLoginTask();
 
   @Test
-  void verifiesTheStoredPasswordHash() {
-    assertThat(task.completed("CaptainJack", "BlackPearl").assignmentSolved()).isTrue();
+  void rejectsTheFormerClientExposedCredentials() {
+    assertThat(task.completed("CaptainJack", "BlackPearl").assignmentSolved()).isFalse();
   }
 
   @Test
