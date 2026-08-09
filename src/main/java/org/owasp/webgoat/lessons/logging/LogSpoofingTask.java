@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.logging;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import org.apache.logging.log4j.util.Strings;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -21,16 +20,13 @@ public class LogSpoofingTask implements AssignmentEndpoint {
   @PostMapping("/LogSpoofing/log-spoofing")
   @ResponseBody
   public AttackResult completed(@RequestParam String username, @RequestParam String password) {
-    if (Strings.isEmpty(username)) {
-      return failed(this).output(username).build();
+    // ASVS V2.2/V7.4: reject CR/LF at the boundary and never echo untrusted log data.
+    if (Strings.isEmpty(username)
+        || username.length() > 64
+        || username.indexOf('\r') >= 0
+        || username.indexOf('\n') >= 0) {
+      return failed(this).output("Invalid username").build();
     }
-    username = username.replace("\n", "<br/>");
-    if (username.contains("<p>") || username.contains("<div>")) {
-      return failed(this).output("Try to think of something simple ").build();
-    }
-    if (username.indexOf("<br/>") < username.indexOf("admin")) {
-      return success(this).output(username).build();
-    }
-    return failed(this).output(username).build();
+    return failed(this).output("Login failed").build();
   }
 }
