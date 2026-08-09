@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.missingac;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -27,15 +26,8 @@ public class MissingFunctionACHiddenMenus implements AssignmentEndpoint {
       path = "/access-control/hidden-menu",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult completed(String hiddenMenu1, String hiddenMenu2) {
-    if (hiddenMenu1.equals("Users") && hiddenMenu2.equals("Config")) {
-      return success(this).output("").feedback("access-control.hidden-menus.success").build();
-    }
-
-    if (hiddenMenu1.equals("Config") && hiddenMenu2.equals("Users")) {
-      return failed(this).output("").feedback("access-control.hidden-menus.close").build();
-    }
-
+  public AttackResult completed() {
+    // ASVS V4.1: client-supplied knowledge of a hidden UI element never grants authorization.
     return failed(this).feedback("access-control.hidden-menus.failure").output("").build();
   }
 }

@@ -4,17 +4,21 @@
  */
 package org.owasp.webgoat.lessons.missingac;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
+import java.io.IOException;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.container.plugins.LessonTest;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 class MissingFunctionACHiddenMenusTest extends LessonTest {
 
   @Test
-  void HiddenMenusSuccess() throws Exception {
+  void hiddenMenuNamesDoNotGrantAccess() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/access-control/hidden-menu")
@@ -23,35 +27,30 @@ class MissingFunctionACHiddenMenusTest extends LessonTest {
         .andExpect(
             jsonPath(
                 "$.feedback",
-                CoreMatchers.is(messages.getMessage("access-control.hidden-menus.success"))))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
-  }
-
-  @Test
-  void HiddenMenusClose() throws Exception {
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/access-control/hidden-menu")
-                .param("hiddenMenu1", "Config")
-                .param("hiddenMenu2", "Users"))
-        .andExpect(
-            jsonPath(
-                "$.feedback",
-                CoreMatchers.is(messages.getMessage("access-control.hidden-menus.close"))))
+                CoreMatchers.is(messages.getMessage("access-control.hidden-menus.failure"))))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
-  void HiddenMenusFailure() throws Exception {
+  void missingParametersDoNotCauseAuthorizationOrAnError() throws Exception {
     mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/access-control/hidden-menu")
-                .param("hiddenMenu1", "Foo")
-                .param("hiddenMenu2", "Bar"))
+        .perform(MockMvcRequestBuilders.post("/access-control/hidden-menu"))
         .andExpect(
             jsonPath(
                 "$.feedback",
                 CoreMatchers.is(messages.getMessage("access-control.hidden-menus.failure"))))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+  }
+
+  @Test
+  void unauthorizedAdminMenuIsAbsentFromThePage() throws IOException {
+    String lessonHtml =
+        new ClassPathResource("lessons/missingac/html/MissingFunctionAC.html")
+            .getContentAsString(UTF_8);
+
+    assertThat(lessonHtml)
+        .doesNotContain("hidden-menu-item")
+        .doesNotContain("access-control/users-admin-fix")
+        .doesNotContain(">Config<");
   }
 }
