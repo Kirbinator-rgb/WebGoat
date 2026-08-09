@@ -48,6 +48,10 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult sendPasswordResetLink(
       @RequestParam String email, @CurrentUsername String username) {
+    String targetAccount = extractUsername(email);
+    if (targetAccount == null || !targetAccount.equalsIgnoreCase(username)) {
+      return failed(this).output("E-mail can't be send. please try again.").build();
+    }
     byte[] tokenBytes = new byte[RESET_TOKEN_BYTES];
     secureRandom.nextBytes(tokenBytes);
     String resetLink = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
@@ -66,8 +70,7 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
   }
 
   private void sendMailToUser(String email, String host, String resetLink) {
-    int index = email.indexOf("@");
-    String username = email.substring(0, index == -1 ? email.length() : index);
+    String username = extractUsername(email);
     PasswordResetEmail mail =
         PasswordResetEmail.builder()
             .title("Your password reset link")
@@ -76,6 +79,18 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
             .recipient(username)
             .build();
     this.restTemplate.postForEntity(webWolfMailURL, mail, Object.class);
+  }
+
+  private String extractUsername(String email) {
+    if (email == null || email.length() > 254) {
+      return null;
+    }
+    int separator = email.indexOf('@');
+    if (separator <= 0 || separator != email.lastIndexOf('@') || separator == email.length() - 1) {
+      return null;
+    }
+    String username = email.substring(0, separator);
+    return username.length() <= 64 ? username : null;
   }
 
 }

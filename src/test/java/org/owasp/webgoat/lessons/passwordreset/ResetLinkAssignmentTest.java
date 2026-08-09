@@ -4,7 +4,6 @@
  */
 package org.owasp.webgoat.lessons.passwordreset;
 
-import static org.owasp.webgoat.lessons.passwordreset.ResetLinkAssignment.TOM_EMAIL;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -84,7 +83,7 @@ class ResetLinkAssignmentTest extends LessonTest {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
-                .param("email", TOM_EMAIL)
+                .param("email", "test@webgoat-cloud.org")
                 .header(HttpHeaders.HOST, webWolfHost + ":" + webWolfPort))
         .andExpect(status().isOk());
     Assertions.assertThat(ResetLinkAssignment.resetLinks).isNotEmpty();
@@ -109,7 +108,7 @@ class ResetLinkAssignmentTest extends LessonTest {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
-                .param("email", TOM_EMAIL))
+                .param("email", "test@webgoat-cloud.org"))
         .andExpect(status().isOk());
     String link = ResetLinkAssignment.resetLinks.keySet().iterator().next();
 
