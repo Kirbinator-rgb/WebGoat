@@ -5,7 +5,8 @@
 package org.owasp.webgoat.lessons.clientsidefiltering;
 
 import static org.hamcrest.Matchers.is;
-import static org.owasp.webgoat.lessons.clientsidefiltering.ClientSideFilteringFreeAssignment.SUPER_COUPON_CODE;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
@@ -30,13 +31,13 @@ public class ShopEndpointTest extends LessonTest {
   }
 
   @Test
-  public void getSuperCoupon() throws Exception {
+  public void freeCouponIsNotExposed() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.get(
-                "/clientSideFiltering/challenge-store/coupons/" + SUPER_COUPON_CODE))
-        .andExpect(jsonPath("$.code", CoreMatchers.is(SUPER_COUPON_CODE)))
-        .andExpect(jsonPath("$.discount", CoreMatchers.is(100)));
+                "/clientSideFiltering/challenge-store/coupons/get_it_for_free"))
+        .andExpect(jsonPath("$.code", CoreMatchers.is("no")))
+        .andExpect(jsonPath("$.discount", CoreMatchers.is(0)));
   }
 
   @Test
@@ -58,9 +59,9 @@ public class ShopEndpointTest extends LessonTest {
   }
 
   @Test
-  public void fetchAllTheCouponsShouldContainGetItForFree() throws Exception {
+  public void couponListDoesNotExposeFreeCheckoutCode() throws Exception {
     mockMvc
         .perform(MockMvcRequestBuilders.get("/clientSideFiltering/challenge-store/coupons"))
-        .andExpect(jsonPath("$.codes[3].code", is("get_it_for_free")));
+        .andExpect(jsonPath("$.codes[*].code", not(hasItem("get_it_for_free"))));
   }
 }
