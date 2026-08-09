@@ -36,7 +36,7 @@ public class SqlInjectionLesson13Test extends LessonTest {
                     "CASE WHEN (SELECT ip FROM servers WHERE hostname='webgoat-prd') LIKE '104.%'"
                         + " THEN hostname ELSE id END"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].hostname", is("webgoat-acc")));
+        .andExpect(jsonPath("$[0].hostname", is("webgoat-dev")));
   }
 
   @Test
@@ -49,7 +49,7 @@ public class SqlInjectionLesson13Test extends LessonTest {
                     "case when (select ip from servers where hostname='webgoat-prd' and"
                         + " substr(ip,1,1) = '1') IS NOT NULL then hostname else id end"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].hostname", is("webgoat-acc")));
+        .andExpect(jsonPath("$[0].hostname", is("webgoat-dev")));
 
     mockMvc
         .perform(
@@ -59,7 +59,7 @@ public class SqlInjectionLesson13Test extends LessonTest {
                     "case when (select ip from servers where hostname='webgoat-prd' and"
                         + " substr(ip,2,1) = '0') IS NOT NULL then hostname else id end"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].hostname", is("webgoat-acc")));
+        .andExpect(jsonPath("$[0].hostname", is("webgoat-dev")));
 
     mockMvc
         .perform(
@@ -69,7 +69,7 @@ public class SqlInjectionLesson13Test extends LessonTest {
                     "case when (select ip from servers where hostname='webgoat-prd' and"
                         + " substr(ip,3,1) = '4') IS NOT NULL then hostname else id end"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].hostname", is("webgoat-acc")));
+        .andExpect(jsonPath("$[0].hostname", is("webgoat-dev")));
   }
 
   @Test
@@ -93,7 +93,7 @@ public class SqlInjectionLesson13Test extends LessonTest {
                 .param("column", "(case when (true) then hostname else id end)"))
         .andExpect(status().isOk())
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].hostname", is("webgoat-acc")));
+        .andExpect(jsonPath("$[0].hostname", is("webgoat-dev")));
   }
 
   @Test
@@ -104,7 +104,7 @@ public class SqlInjectionLesson13Test extends LessonTest {
                 .param("column", "(case when (true) then hostname else id end)"))
         .andExpect(status().isOk())
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].hostname", is("webgoat-acc")));
+        .andExpect(jsonPath("$[0].hostname", is("webgoat-dev")));
   }
 
   @Test
