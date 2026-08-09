@@ -37,8 +37,8 @@ class SpoofCookieAssignmentTest extends LessonTest {
   private static final String ERASE_COOKIE_CONTEXT_PATH = "/SpoofCookie/cleanup";
 
   @Test
-  @DisplayName("Lesson completed")
-  void success() throws Exception {
+  @DisplayName("Legacy forged Tom cookie is rejected")
+  void forgedCookieIsRejected() throws Exception {
     Cookie cookie = new Cookie(COOKIE_NAME, "NjI2MTcwNGI3YTQxNGE1OTU2NzQ2ZDZmNzQ=");
 
     ResultActions result =
@@ -49,7 +49,7 @@ class SpoofCookieAssignmentTest extends LessonTest {
                 .param("password", ""));
 
     result.andExpect(status().isOk());
-    result.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+    result.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
@@ -68,6 +68,8 @@ class SpoofCookieAssignmentTest extends LessonTest {
     result.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
     result.andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE));
     result.andExpect(cookie().value(COOKIE_NAME, not(emptyString())));
+    result.andExpect(cookie().httpOnly(COOKIE_NAME, true));
+    result.andExpect(cookie().secure(COOKIE_NAME, true));
   }
 
   @ParameterizedTest

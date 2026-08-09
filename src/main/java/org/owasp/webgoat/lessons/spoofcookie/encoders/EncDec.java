@@ -4,10 +4,19 @@
  */
 package org.owasp.webgoat.lessons.spoofcookie.encoders;
 
-import java.nio.charset.StandardCharsets;
+import static java.nio.charset.StandardCharsets.US_ASCII;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.springframework.security.crypto.codec.Hex;
+import java.util.Locale;
+import java.util.regex.Pattern;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /***
  *
@@ -17,9 +26,13 @@ import org.springframework.security.crypto.codec.Hex;
 
 public class EncDec {
 
-  // PoC: weak encoding method
-
-  private static final String SALT = RandomStringUtils.randomAlphabetic(10);
+  private static final int KEY_BYTES = 32;
+  private static final int MAX_COOKIE_LENGTH = 256;
+  private static final Duration COOKIE_TTL = Duration.ofMinutes(15);
+  private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-z0-9._-]{1,64}");
+  private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
+  private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
+  private static final SecretKeySpec SIGNING_KEY = createSigningKey();
 
   private EncDec() {}
 
@@ -28,43 +41,75 @@ public class EncDec {
       return null;
     }
 
-    String encoded = value.toLowerCase() + SALT;
-    encoded = revert(encoded);
-    encoded = hexEncode(encoded);
-    return base64Encode(encoded);
+    String username = value.toLowerCase(Locale.ROOT);
+    if (!USERNAME_PATTERN.matcher(username).matches()) {
+      throw invalidCookie();
+    }
+
+    String payload = username + ":" + Instant.now().getEpochSecond();
+    String encodedPayload = ENCODER.encodeToString(payload.getBytes(UTF_8));
+    String signature = ENCODER.encodeToString(sign(encodedPayload.getBytes(US_ASCII)));
+    return encodedPayload + "." + signature;
   }
 
   public static String decode(final String encodedValue) throws IllegalArgumentException {
     if (encodedValue == null) {
       return null;
     }
+    if (encodedValue.length() > MAX_COOKIE_LENGTH) {
+      throw invalidCookie();
+    }
 
-    String decoded = base64Decode(encodedValue);
-    decoded = hexDecode(decoded);
-    decoded = revert(decoded);
-    return decoded.substring(0, decoded.length() - SALT.length());
+    int separator = encodedValue.indexOf('.');
+    if (separator <= 0 || separator != encodedValue.lastIndexOf('.')) {
+      throw invalidCookie();
+    }
+
+    try {
+      String encodedPayload = encodedValue.substring(0, separator);
+      byte[] suppliedSignature = DECODER.decode(encodedValue.substring(separator + 1));
+      byte[] expectedSignature = sign(encodedPayload.getBytes(US_ASCII));
+      // ASVS V3.2/V6.4: authenticate client-side state and compare MACs in constant time.
+      if (!MessageDigest.isEqual(expectedSignature, suppliedSignature)) {
+        throw invalidCookie();
+      }
+
+      String payload = new String(DECODER.decode(encodedPayload), UTF_8);
+      int timestampSeparator = payload.lastIndexOf(':');
+      if (timestampSeparator <= 0) {
+        throw invalidCookie();
+      }
+      String username = payload.substring(0, timestampSeparator);
+      long issuedAt = Long.parseLong(payload.substring(timestampSeparator + 1));
+      long age = Instant.now().getEpochSecond() - issuedAt;
+      if (!USERNAME_PATTERN.matcher(username).matches()
+          || age < 0
+          || age > COOKIE_TTL.toSeconds()) {
+        throw invalidCookie();
+      }
+      return username;
+    } catch (IllegalArgumentException exception) {
+      throw invalidCookie();
+    }
   }
 
-  private static String revert(final String value) {
-    return new StringBuilder(value).reverse().toString();
+  private static byte[] sign(byte[] payload) {
+    try {
+      Mac mac = Mac.getInstance("HmacSHA256");
+      mac.init(SIGNING_KEY);
+      return mac.doFinal(payload);
+    } catch (java.security.InvalidKeyException | NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("HMAC-SHA-256 is unavailable", exception);
+    }
   }
 
-  private static String hexEncode(final String value) {
-    char[] encoded = Hex.encode(value.getBytes(StandardCharsets.UTF_8));
-    return new String(encoded);
+  private static SecretKeySpec createSigningKey() {
+    byte[] key = new byte[KEY_BYTES];
+    new SecureRandom().nextBytes(key);
+    return new SecretKeySpec(key, "HmacSHA256");
   }
 
-  private static String hexDecode(final String value) {
-    byte[] decoded = Hex.decode(value);
-    return new String(decoded);
-  }
-
-  private static String base64Encode(final String value) {
-    return Base64.getEncoder().encodeToString(value.getBytes());
-  }
-
-  private static String base64Decode(final String value) {
-    byte[] decoded = Base64.getDecoder().decode(value.getBytes());
-    return new String(decoded);
+  private static IllegalArgumentException invalidCookie() {
+    return new IllegalArgumentException("Invalid authentication cookie");
   }
 }
