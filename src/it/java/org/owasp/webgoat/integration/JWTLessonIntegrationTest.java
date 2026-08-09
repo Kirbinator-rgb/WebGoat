@@ -212,7 +212,7 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void deleteTomThroughKidClaim() {

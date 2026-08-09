@@ -77,7 +77,7 @@ public class JWTRefreshEndpointTest extends LessonTest {
   }
 
   @Test
-  void solutionWithAlgNone() throws Exception {
+  void rejectsTokenWithNoneAlgorithm() throws Exception {
     String tokenWithNoneAlgorithm =
         Jwts.builder()
             .setHeaderParam("alg", "none")
@@ -90,9 +90,37 @@ public class JWTRefreshEndpointTest extends LessonTest {
             MockMvcRequestBuilders.post("/JWT/refresh/checkout")
                 .header("Authorization", "Bearer " + tokenWithNoneAlgorithm))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)))
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
         .andExpect(
-            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("jwt-refresh-alg-none"))));
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("jwt-invalid-token"))));
+  }
+
+  @Test
+  void rejectsUnsignedTokenDuringRefresh() throws Exception {
+    ObjectMapper objectMapper = new ObjectMapper();
+    var loginJson = Map.of("user", "Jerry", "password", PASSWORD);
+    MvcResult loginResult =
+        mockMvc
+            .perform(
+                MockMvcRequestBuilders.post("/JWT/refresh/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(loginJson)))
+            .andExpect(status().isOk())
+            .andReturn();
+    Map<String, String> tokens =
+        objectMapper.readValue(loginResult.getResponse().getContentAsString(), Map.class);
+    String unsignedToken =
+        Jwts.builder().setHeaderParam("alg", "none").claim("user", "Tom").compact();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/JWT/refresh/newToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + unsignedToken)
+                .content(
+                    objectMapper.writeValueAsString(
+                        Map.of("refresh_token", tokens.get("refresh_token")))))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

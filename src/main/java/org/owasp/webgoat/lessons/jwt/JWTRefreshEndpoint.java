@@ -11,9 +11,11 @@ import static org.springframework.http.ResponseEntity.ok;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Header;
-import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.UnsupportedJwtException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -44,6 +46,8 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
 
   public static final String PASSWORD = "bm5nhSkxCXZkKRy4";
   private static final String JWT_PASSWORD = "bm5n3SkxCX4kKRy4";
+  private static final String BEARER_PREFIX = "Bearer ";
+  private static final int MAX_TOKEN_LENGTH = 4096;
   private static final List<String> validRefreshTokens = new ArrayList<>();
 
   @PostMapping(
@@ -88,13 +92,10 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
     try {
-      Jwt jwt = Jwts.parser().setSigningKey(JWT_PASSWORD).parse(token.replace("Bearer ", ""));
-      Claims claims = (Claims) jwt.getBody();
+      Jws<Claims> jwt = parseSignedAccessToken(token);
+      Claims claims = jwt.getBody();
       String user = (String) claims.get("user");
       if ("Tom".equals(user)) {
-        if ("none".equals(jwt.getHeader().get("alg"))) {
-          return ok(success(this).feedback("jwt-refresh-alg-none").build());
-        }
         return ok(success(this).build());
       }
       return ok(failed(this).feedback("jwt-refresh-not-tom").feedbackArgs(user).build());
@@ -117,13 +118,17 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
     String user;
     String refreshToken;
     try {
-      Jwt<Header, Claims> jwt =
-          Jwts.parser().setSigningKey(JWT_PASSWORD).parse(token.replace("Bearer ", ""));
+      Jws<Claims> jwt = parseSignedAccessToken(token);
       user = (String) jwt.getBody().get("user");
       refreshToken = (String) json.get("refresh_token");
     } catch (ExpiredJwtException e) {
+      if (!usesExpectedAlgorithm(e.getHeader())) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+      }
       user = (String) e.getClaims().get("user");
       refreshToken = (String) json.get("refresh_token");
+    } catch (JwtException e) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
     if (user == null || refreshToken == null) {
@@ -134,5 +139,28 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
     } else {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
+  }
+
+  private Jws<Claims> parseSignedAccessToken(String authorization) {
+    if (!authorization.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
+      throw new UnsupportedJwtException("Bearer authorization is required");
+    }
+
+    String compactToken = authorization.substring(BEARER_PREFIX.length());
+    if (compactToken.isBlank() || compactToken.length() > MAX_TOKEN_LENGTH) {
+      throw new UnsupportedJwtException("Invalid token length");
+    }
+
+    // ASVS V9.1: require a verified JWS and pin the server-selected signing algorithm.
+    Jws<Claims> jwt =
+        Jwts.parser().setSigningKey(JWT_PASSWORD).parseClaimsJws(compactToken);
+    if (!usesExpectedAlgorithm(jwt.getHeader())) {
+      throw new UnsupportedJwtException("Unexpected signing algorithm");
+    }
+    return jwt;
+  }
+
+  private boolean usesExpectedAlgorithm(Header header) {
+    return SignatureAlgorithm.HS512.getValue().equals(header.get("alg"));
   }
 }
