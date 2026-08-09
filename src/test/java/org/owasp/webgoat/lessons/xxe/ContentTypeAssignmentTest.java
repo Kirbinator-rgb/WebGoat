@@ -44,7 +44,7 @@ class ContentTypeAssignmentTest extends LessonTest {
   }
 
   @Test
-  void workingAttack() throws Exception {
+  void rejectsXmlContentType() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/xxe/content-type")
@@ -52,9 +52,7 @@ class ContentTypeAssignmentTest extends LessonTest {
                 .content(
                     "<?xml version=\"1.0\" standalone=\"yes\" ?><!DOCTYPE user [<!ENTITY root"
                         + " SYSTEM \"file:///\"> ]><comment><text>&root;</text></comment>"))
-        .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.solved"))));
+        .andExpect(status().isUnsupportedMediaType());
   }
 
   @Test
