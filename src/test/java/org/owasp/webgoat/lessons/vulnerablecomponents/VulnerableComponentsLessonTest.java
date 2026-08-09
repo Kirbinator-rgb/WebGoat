@@ -4,62 +4,89 @@
  */
 package org.owasp.webgoat.lessons.vulnerablecomponents;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.thoughtworks.xstream.XStream;
-import com.thoughtworks.xstream.io.StreamException;
-import org.junit.jupiter.api.Disabled;
+import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
+import org.owasp.webgoat.container.plugins.LessonTest;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-public class VulnerableComponentsLessonTest {
+class VulnerableComponentsLessonTest extends LessonTest {
 
-  String strangeContact =
-      "<contact class='dynamic-proxy'>\n"
-          + "<interface>org.owasp.webgoat.vulnerablecomponents.Contact</interface>\n"
-          + "  <handler class='java.beans.EventHandler'>\n"
-          + "    <target class='java.lang.ProcessBuilder'>\n"
-          + "      <command>\n"
-          + "        <string>calc.exe</string>\n"
-          + "      </command>\n"
-          + "    </target>\n"
-          + "    <action>start</action>\n"
-          + "  </handler>\n"
-          + "</contact>";
-  String contact = "<contact>\n" + "</contact>";
+  public static class CallbackTarget {
 
-  @Test
-  public void testTransformation() throws Exception {
-    XStream xstream = new XStream();
-    xstream.setClassLoader(Contact.class.getClassLoader());
-    xstream.alias("contact", ContactImpl.class);
-    xstream.ignoreUnknownElements();
-    assertThat(xstream.fromXML(contact)).isNotNull();
+    private static boolean callbackInvoked;
+
+    public String trigger() {
+      callbackInvoked = true;
+      return "called";
+    }
   }
 
   @Test
-  @Disabled
-  public void testIllegalTransformation() throws Exception {
-    XStream xstream = new XStream();
-    xstream.setClassLoader(Contact.class.getClassLoader());
-    xstream.alias("contact", ContactImpl.class);
-    xstream.ignoreUnknownElements();
-    Exception e =
-        assertThrows(
-            RuntimeException.class,
-            () -> ((Contact) xstream.fromXML(strangeContact)).getFirstName());
-    assertThat(e.getCause().getMessage().contains("calc.exe")).isTrue();
+  void acceptsExpectedContactData() throws Exception {
+    String contact =
+        "<contact><id>1</id><firstName>Alice</firstName><lastName>Doe</lastName>"
+            + "<email>alice@example.org</email></contact>";
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/VulnerableComponents/attack1")
+                .param("payload", contact))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
-  public void testIllegalPayload() throws Exception {
-    XStream xstream = new XStream();
-    xstream.setClassLoader(Contact.class.getClassLoader());
-    xstream.alias("contact", ContactImpl.class);
-    xstream.ignoreUnknownElements();
-    Exception e =
-        assertThrows(
-            StreamException.class, () -> ((Contact) xstream.fromXML("bullssjfs")).getFirstName());
-    assertThat(e.getCause().getMessage().contains("START_DOCUMENT")).isTrue();
+  void rejectsDynamicProxyBeforeCallbackRuns() throws Exception {
+    CallbackTarget.callbackInvoked = false;
+    String gadget =
+        "<contact class='dynamic-proxy'>"
+            + "<interface>org.owasp.webgoat.lessons.vulnerablecomponents.Contact</interface>"
+            + "<handler class='java.beans.EventHandler'>"
+            + "<target class='org.owasp.webgoat.lessons.vulnerablecomponents."
+            + "VulnerableComponentsLessonTest$CallbackTarget'/>"
+            + "<action>trigger</action>"
+            + "</handler>"
+            + "</contact>";
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/VulnerableComponents/attack1")
+                .param("payload", gadget))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.feedback",
+                CoreMatchers.is(messages.getMessage("vulnerable-components.close"))))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+
+    assertFalse(CallbackTarget.callbackInvoked);
+  }
+
+  @Test
+  void rejectsUnexpectedRootType() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/VulnerableComponents/attack1")
+                .param("payload", "<string>unexpected</string>"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+  }
+
+  @Test
+  void rejectsMalformedXmlWithoutReturningParserDetails() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/VulnerableComponents/attack1")
+                .param("payload", "not-xml"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.feedback",
+                CoreMatchers.is(messages.getMessage("vulnerable-components.close"))))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 }
