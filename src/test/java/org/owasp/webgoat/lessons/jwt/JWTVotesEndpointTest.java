@@ -4,10 +4,10 @@
  */
 package org.owasp.webgoat.lessons.jwt;
 
+import static io.jsonwebtoken.SignatureAlgorithm.HS512;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
-import static org.owasp.webgoat.lessons.jwt.JWTVotesEndpoint.JWT_PASSWORD;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -15,13 +15,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.impl.TextCodec;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.util.Map;
+import javax.crypto.spec.SecretKeySpec;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.WithWebGoatUser;
 import org.owasp.webgoat.container.plugins.LessonTest;
+import org.owasp.webgoat.lessons.jwt.votes.Views;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -30,45 +35,51 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 @WithWebGoatUser
 public class JWTVotesEndpointTest extends LessonTest {
 
+  private static final Key TEST_SIGNING_KEY =
+      new SecretKeySpec(
+          "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+              .getBytes(StandardCharsets.UTF_8),
+          "HmacSHA512");
+
   @BeforeEach
   public void setup() {
     this.mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).build();
   }
 
   @Test
-  public void solveAssignment() throws Exception {
-    // Create new token and set alg to none and do not sign it
+  public void unsignedStringAdminTokenCannotResetVotes() throws Exception {
     Claims claims = Jwts.claims();
     claims.put("admin", "true");
     claims.put("user", "Tom");
     String token = Jwts.builder().setClaims(claims).setHeaderParam("alg", "none").compact();
 
-    // Call the reset endpoint
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/JWT/votings")
                 .contentType(MediaType.APPLICATION_JSON)
                 .cookie(new Cookie("access_token", token)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("jwt-invalid-token"))));
   }
 
   @Test
-  public void solveAssignmentWithBoolean() throws Exception {
-    // Create new token and set alg to none and do not sign it
+  public void unsignedBooleanAdminTokenCannotResetVotes() throws Exception {
     Claims claims = Jwts.claims();
     claims.put("admin", true);
     claims.put("user", "Tom");
     String token = Jwts.builder().setClaims(claims).setHeaderParam("alg", "none").compact();
 
-    // Call the reset endpoint
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/JWT/votings")
                 .contentType(MediaType.APPLICATION_JSON)
                 .cookie(new Cookie("access_token", token)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("jwt-invalid-token"))));
   }
 
   @Test
@@ -101,6 +112,17 @@ public class JWTVotesEndpointTest extends LessonTest {
                 .param("user", "Tom"))
         .andExpect(status().isOk())
         .andExpect(cookie().value("access_token", containsString("eyJhbGciOiJIUzUxMiJ9.")));
+  }
+
+  @Test
+  public void combinedKnownNamesShouldNotGetAToken() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.get("/JWT/votings/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .param("user", "TomJerry"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(cookie().value("access_token", ""));
   }
 
   @Test
@@ -206,16 +228,11 @@ public class JWTVotesEndpointTest extends LessonTest {
     claims.put("admin", "true");
     claims.put("user", "Intruder");
     String token =
-        Jwts.builder()
-            .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
-            .setClaims(claims)
-            .compact();
+        Jwts.builder().setClaims(claims).signWith(HS512, TEST_SIGNING_KEY).compact();
+    JWTVotesEndpoint endpoint = new JWTVotesEndpoint(TEST_SIGNING_KEY);
+    endpoint.initVotes();
 
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/JWT/votings/Admin lost password")
-                .cookie(new Cookie("access_token", token)))
-        .andExpect(status().isUnauthorized());
+    assertThat(endpoint.vote("Admin lost password", token).getStatusCode().value()).isEqualTo(401);
   }
 
   @Test
@@ -224,17 +241,43 @@ public class JWTVotesEndpointTest extends LessonTest {
     claims.put("admin", "true");
     claims.put("user", "Intruder");
     String token =
+        Jwts.builder().setClaims(claims).signWith(HS512, TEST_SIGNING_KEY).compact();
+    JWTVotesEndpoint endpoint = new JWTVotesEndpoint(TEST_SIGNING_KEY);
+    endpoint.initVotes();
+
+    assertThat(endpoint.getVotes(token).getSerializationView()).isEqualTo(Views.GuestView.class);
+  }
+
+  @Test
+  void legacyWeakKeyCannotForgeAdminToken() throws Exception {
+    Claims claims = Jwts.claims();
+    claims.put("admin", true);
+    claims.put("user", "Tom");
+    String token =
         Jwts.builder()
-            .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
             .setClaims(claims)
+            .signWith(HS512, TextCodec.BASE64.encode("victory"))
             .compact();
 
     mockMvc
         .perform(
-            MockMvcRequestBuilders.get("/JWT/votings").cookie(new Cookie("access_token", token)))
+            MockMvcRequestBuilders.post("/JWT/votings")
+                .cookie(new Cookie("access_token", token)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].numberOfVotes").doesNotExist())
-        .andExpect(jsonPath("$[0].votingAllowed").doesNotExist())
-        .andExpect(jsonPath("$[0].average").doesNotExist());
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("jwt-invalid-token"))));
+  }
+
+  @Test
+  void validSignedAdminTokenCanResetVotes() {
+    Claims claims = Jwts.claims();
+    claims.put("admin", true);
+    claims.put("user", "Tom");
+    String token = Jwts.builder().setClaims(claims).signWith(HS512, TEST_SIGNING_KEY).compact();
+    JWTVotesEndpoint endpoint = new JWTVotesEndpoint(TEST_SIGNING_KEY);
+    endpoint.initVotes();
+
+    assertThat(endpoint.resetVotes(token).assignmentSolved()).isTrue();
   }
 }
