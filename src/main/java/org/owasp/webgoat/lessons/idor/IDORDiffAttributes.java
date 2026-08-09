@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.idor;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -26,18 +25,7 @@ public class IDORDiffAttributes implements AssignmentEndpoint {
   @PostMapping("/IDOR/diff-attributes")
   @ResponseBody
   public AttackResult completed(@RequestParam String attributes) {
-    attributes = attributes.trim();
-    String[] diffAttribs = attributes.split(",");
-    if (diffAttribs.length < 2) {
-      return failed(this).feedback("idor.diff.attributes.missing").build();
-    }
-    if (diffAttribs[0].toLowerCase().trim().equals("userid")
-            && diffAttribs[1].toLowerCase().trim().equals("role")
-        || diffAttribs[1].toLowerCase().trim().equals("userid")
-            && diffAttribs[0].toLowerCase().trim().equals("role")) {
-      return success(this).feedback("idor.diff.success").build();
-    } else {
-      return failed(this).feedback("idor.diff.failure").build();
-    }
+    // Protected schema details are server-owned and are never validated from client guesses.
+    return failed(this).feedback("idor.diff.failure").build();
   }
 }
