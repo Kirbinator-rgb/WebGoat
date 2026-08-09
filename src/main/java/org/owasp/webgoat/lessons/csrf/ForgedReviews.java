@@ -10,6 +10,8 @@ import static org.springframework.http.MediaType.ALL_VALUE;
 
 import com.google.common.collect.Lists;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -31,7 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 @AssignmentHints({"csrf-review-hint1", "csrf-review-hint2", "csrf-review-hint3"})
 public class ForgedReviews implements AssignmentEndpoint {
 
-  private static DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd, HH:mm:ss");
+  private static final DateTimeFormatter fmt =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd, HH:mm:ss");
 
   private static final Map<String, List<Review>> userReviews = new HashMap<>();
   private static final List<Review> REVIEWS = new ArrayList<>();
@@ -75,10 +78,16 @@ public class ForgedReviews implements AssignmentEndpoint {
       String validateReq,
       HttpServletRequest request,
       @CurrentUsername String username) {
-    final String host = (request.getHeader("host") == null) ? "NULL" : request.getHeader("host");
-    final String referer =
-        (request.getHeader("referer") == null) ? "NULL" : request.getHeader("referer");
-    final String[] refererArr = referer.split("/");
+    if (!"XMLHttpRequest".equals(request.getHeader("X-Requested-With"))
+        || !validToken(validateReq)
+        || reviewText == null
+        || reviewText.isBlank()
+        || reviewText.length() > 1000
+        || stars == null
+        || stars < 1
+        || stars > 5) {
+      return failed(this).feedback("csrf-you-forgot-something").build();
+    }
 
     Review review = new Review();
     review.setText(reviewText);
@@ -88,17 +97,13 @@ public class ForgedReviews implements AssignmentEndpoint {
     var reviews = userReviews.getOrDefault(username, new ArrayList<>());
     reviews.add(review);
     userReviews.put(username, reviews);
-    // short-circuit
-    if (validateReq == null || !validateReq.equals(weakAntiCSRF)) {
-      return failed(this).feedback("csrf-you-forgot-something").build();
-    }
-    // we have the spoofed files
-    if (referer != "NULL" && refererArr[2].equals(host)) {
-      return failed(this).feedback("csrf-same-host").build();
-    } else {
-      return success(this)
-          .feedback("csrf-review.success")
-          .build(); // feedback("xss-stored-comment-failure")
-    }
+    return success(this).feedback("csrf-review.success").build();
+  }
+
+  private boolean validToken(String suppliedToken) {
+    return suppliedToken != null
+        && MessageDigest.isEqual(
+            weakAntiCSRF.getBytes(StandardCharsets.UTF_8),
+            suppliedToken.getBytes(StandardCharsets.UTF_8));
   }
 }
