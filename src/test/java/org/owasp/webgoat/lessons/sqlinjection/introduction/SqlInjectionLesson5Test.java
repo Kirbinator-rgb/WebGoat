@@ -29,13 +29,14 @@ public class SqlInjectionLesson5Test extends LessonTest {
   }
 
   @Test
-  public void grantSolution() throws Exception {
+  public void arbitraryGrantIsNotExecuted() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjection/attack5")
                 .param("query", "grant select on grant_rights to unauthorized_user"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)))
+        .andExpect(jsonPath("$.output", CoreMatchers.nullValue()));
   }
 
   @Test
