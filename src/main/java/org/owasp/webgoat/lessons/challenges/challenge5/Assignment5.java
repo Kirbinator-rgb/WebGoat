@@ -36,17 +36,18 @@ public class Assignment5 implements AssignmentEndpoint {
     if (!StringUtils.hasText(username_login) || !StringUtils.hasText(password_login)) {
       return failed(this).feedback("required4").build();
     }
+    if (username_login.length() > 64 || password_login.length() > 128) {
+      return failed(this).feedback("challenge.close").build();
+    }
     if (!"Larry".equals(username_login)) {
       return failed(this).feedback("user.not.larry").feedbackArgs(username_login).build();
     }
     try (var connection = dataSource.getConnection()) {
       PreparedStatement statement =
           connection.prepareStatement(
-              "select password from challenge_users where userid = '"
-                  + username_login
-                  + "' and password = '"
-                  + password_login
-                  + "'");
+              "select password from challenge_users where userid = ? and password = ?");
+      statement.setString(1, username_login);
+      statement.setString(2, password_login);
       ResultSet resultSet = statement.executeQuery();
 
       if (resultSet.next()) {
