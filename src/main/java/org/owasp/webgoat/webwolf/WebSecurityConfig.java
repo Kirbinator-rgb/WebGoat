@@ -38,7 +38,6 @@ public class WebSecurityConfig {
                       HttpMethod.GET,
                       "/fileupload/**",
                       "/files/**",
-                      "/landing/**",
                       "/PasswordReset/**")
                   .permitAll();
               auth.requestMatchers(HttpMethod.POST, "/files", "/mail", "/requests").permitAll();
