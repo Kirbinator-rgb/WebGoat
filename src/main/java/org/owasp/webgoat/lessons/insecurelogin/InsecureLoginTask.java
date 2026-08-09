@@ -9,24 +9,24 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
-import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class InsecureLoginTask implements AssignmentEndpoint {
 
+  private static final String EXPECTED_USERNAME = "CaptainJack";
+  private static final String EXPECTED_PASSWORD_HASH =
+      "$2y$12$/NJwACW4tWLb.0ft2oqA2eHEurjoKlLdstAj3oCDWT7q4Qk0sv1AW";
+  private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
+
   @PostMapping("/InsecureLogin/task")
   @ResponseBody
   public AttackResult completed(@RequestParam String username, @RequestParam String password) {
-    if ("CaptainJack".equals(username) && "BlackPearl".equals(password)) {
+    // ASVS V6.2: verify passwords with an adaptive one-way hash, never a plaintext secret.
+    if (EXPECTED_USERNAME.equals(username) && PASSWORD_ENCODER.matches(password, EXPECTED_PASSWORD_HASH)) {
       return success(this).build();
     }
     return failed(this).build();
-  }
-
-  @PostMapping("/InsecureLogin/login")
-  @ResponseStatus(HttpStatus.ACCEPTED)
-  public void login() {
-    // only need to exists as the JS needs to call an existing endpoint
   }
 }
