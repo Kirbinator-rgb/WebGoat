@@ -45,15 +45,15 @@ public class CryptoUtil {
     return keyPairGenerator.generateKeyPair();
   }
 
-  public static String getPrivateKeyInPEM(KeyPair keyPair) {
-    String encodedString = "-----BEGIN PRIVATE KEY-----\n";
+  public static String getPublicKeyInPEM(KeyPair keyPair) {
+    String encodedString = "-----BEGIN PUBLIC KEY-----\n";
     encodedString =
         encodedString
             + new String(
-                Base64.getEncoder().encode(keyPair.getPrivate().getEncoded()),
+                Base64.getEncoder().encode(keyPair.getPublic().getEncoded()),
                 Charset.forName("UTF-8"))
             + "\n";
-    encodedString = encodedString + "-----END PRIVATE KEY-----\n";
+    encodedString = encodedString + "-----END PUBLIC KEY-----\n";
     return encodedString;
   }
 
@@ -141,7 +141,8 @@ public class CryptoUtil {
     byte[] decoded = Base64.getDecoder().decode(privateKeyPem);
 
     PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(decoded);
-    KeyFactory kf = KeyFactory.getInstance("RSA");
-    return kf.generatePrivate(spec);
+    KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+    return keyFactory.generatePrivate(spec);
   }
+
 }

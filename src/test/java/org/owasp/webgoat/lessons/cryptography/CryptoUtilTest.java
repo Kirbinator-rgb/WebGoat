@@ -8,8 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 import java.security.KeyPair;
-import java.security.PrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Base64;
 import javax.xml.bind.DatatypeConverter;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
@@ -22,14 +22,22 @@ public class CryptoUtilTest {
     try {
       KeyPair keyPair = CryptoUtil.generateKeyPair();
       RSAPublicKey rsaPubKey = (RSAPublicKey) keyPair.getPublic();
-      PrivateKey privateKey =
-          CryptoUtil.getPrivateKeyFromPEM(CryptoUtil.getPrivateKeyInPEM(keyPair));
       String modulus = DatatypeConverter.printHexBinary(rsaPubKey.getModulus().toByteArray());
-      String signature = CryptoUtil.signMessage(modulus, privateKey);
+      String signature = CryptoUtil.signMessage(modulus, keyPair.getPrivate());
       log.debug("public exponent {}", rsaPubKey.getPublicExponent());
       assertThat(CryptoUtil.verifyAssignment(modulus, signature, keyPair.getPublic())).isTrue();
     } catch (Exception e) {
       fail("Signing failed");
     }
+  }
+
+  @Test
+  void onlyExportsPublicKeyMaterial() throws Exception {
+    KeyPair keyPair = CryptoUtil.generateKeyPair();
+
+    assertThat(CryptoUtil.getPublicKeyInPEM(keyPair))
+        .startsWith("-----BEGIN PUBLIC KEY-----")
+        .doesNotContain("PRIVATE KEY")
+        .doesNotContain(Base64.getEncoder().encodeToString(keyPair.getPrivate().getEncoded()));
   }
 }

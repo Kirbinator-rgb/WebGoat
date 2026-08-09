@@ -36,17 +36,16 @@ public class SigningAssignment implements AssignmentEndpoint {
 
   @RequestMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
-  public String getPrivateKey(HttpServletRequest request)
+  public String getPublicKey(HttpServletRequest request)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
-    String privateKey = (String) request.getSession().getAttribute("privateKeyString");
-    if (privateKey == null) {
-      KeyPair keyPair = CryptoUtil.generateKeyPair();
-      privateKey = CryptoUtil.getPrivateKeyInPEM(keyPair);
-      request.getSession().setAttribute("privateKeyString", privateKey);
+    KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
+    if (keyPair == null) {
+      keyPair = CryptoUtil.generateKeyPair();
       request.getSession().setAttribute("keyPair", keyPair);
     }
-    return privateKey;
+    // ASVS V11.6: private signing keys must not cross the server trust boundary.
+    return CryptoUtil.getPublicKeyInPEM(keyPair);
   }
 
   @PostMapping("/crypto/signing/verify")
