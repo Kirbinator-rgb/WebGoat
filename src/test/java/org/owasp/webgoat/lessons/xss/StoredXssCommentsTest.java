@@ -18,7 +18,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 class StoredXssCommentsTest extends LessonTest {
 
   @Test
-  void success() throws Exception {
+  void storesPhoneHomePayloadAsNonExecutableText() throws Exception {
     ResultActions results =
         mockMvc.perform(
             MockMvcRequestBuilders.post("/CrossSiteScriptingStored/stored-xss")
@@ -27,7 +27,7 @@ class StoredXssCommentsTest extends LessonTest {
                 .contentType(MediaType.APPLICATION_JSON));
 
     results.andExpect(status().isOk());
-    results.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+    results.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
@@ -42,29 +42,14 @@ class StoredXssCommentsTest extends LessonTest {
     results.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
-  /* For the next two tests there is a comment seeded ...
-     comments.add(new Comment("secUriTy", DateTime.now().toString(fmt), "<script>console.warn('unit test me')</script>Comment for Unit Testing"));
-     ... the isEncoded method will remain commented out as it will fail (because WebGoat isn't supposed to be secure)
-  */
-
-  // Ensures it is vulnerable
   @Test
-  public void isNotEncoded() throws Exception {
-    // do get to get comments after posting xss payload
+  public void encodesSeededComments() throws Exception {
     ResultActions taintedResults =
         mockMvc.perform(MockMvcRequestBuilders.get("/CrossSiteScriptingStored/stored-xss"));
     MvcResult mvcResult = taintedResults.andReturn();
-    assert (mvcResult.getResponse().getContentAsString().contains("<script>console.warn"));
+    String body = mvcResult.getResponse().getContentAsString();
+    org.assertj.core.api.Assertions.assertThat(body)
+        .doesNotContain("<script>console.warn")
+        .contains("&lt;script&gt;console.warn");
   }
-
-  // Could be used to test an encoding solution ... commented out so build will pass. Uncommenting
-  // will fail build, but leaving in as positive Security Unit Test
-  //    @Test
-  //    public void isEncoded() throws Exception {
-  //        //do get to get comments after posting xss payload
-  //        ResultActions taintedResults =
-  // mockMvc.perform(MockMvcRequestBuilders.get("/CrossSiteScripting/stored-xss"));
-  //
-  // taintedResults.andExpect(jsonPath("$[0].text",CoreMatchers.is(CoreMatchers.containsString("&lt;scriptgt;"))));
-  //    }
 }
