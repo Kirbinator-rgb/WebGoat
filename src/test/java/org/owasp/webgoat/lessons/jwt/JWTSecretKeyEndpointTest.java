@@ -63,19 +63,20 @@ public class JWTSecretKeyEndpointTest extends LessonTest {
   }
 
   @Test
-  public void validTokenForWebGoatCompletesAssignment() {
+  public void validTokenForWebGoatCannotCompleteAssignment() {
     Claims claims = createClaims("WebGoat");
     String token = Jwts.builder().setClaims(claims).signWith(HS256, TEST_SIGNING_KEY).compact();
 
-    assertThat(endpoint.login(token).assignmentSolved(), is(true));
+    assertThat(endpoint.login(token).assignmentSolved(), is(false));
+    assertThat(endpoint.login(token).getFeedback(), is("jwt-invalid-token"));
   }
 
   @Test
-  public void validTokenAcceptsCaseInsensitiveUsername() {
+  public void validTokenDoesNotAcceptCaseInsensitiveForgedUsername() {
     Claims claims = createClaims("webgoat");
     String token = Jwts.builder().setClaims(claims).signWith(HS256, TEST_SIGNING_KEY).compact();
 
-    assertThat(endpoint.login(token).assignmentSolved(), is(true));
+    assertThat(endpoint.login(token).assignmentSolved(), is(false));
   }
 
   @Test

@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.jwt;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -86,7 +85,7 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
 
       String user = claims.get("username", String.class);
       if (WEBGOAT_USER.equalsIgnoreCase(user)) {
-        return success(this).build();
+        return invalidToken();
       }
       return failed(this).feedback("jwt-secret-incorrect-user").feedbackArgs(user).build();
     } catch (JwtException | IllegalArgumentException e) {
