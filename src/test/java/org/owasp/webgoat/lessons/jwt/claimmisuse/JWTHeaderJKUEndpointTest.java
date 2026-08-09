@@ -7,6 +7,7 @@ package org.owasp.webgoat.lessons.jwt.claimmisuse;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static io.jsonwebtoken.SignatureAlgorithm.RS256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -14,6 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import io.jsonwebtoken.Jwts;
+import java.net.URI;
+import java.net.URL;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPublicKey;
@@ -21,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.jose4j.jwk.JsonWebKeySet;
 import org.jose4j.jwk.RsaJsonWebKey;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +33,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class JWTHeaderJKUEndpointTest extends LessonTest {
+  private static final String KEY_ID = "webgoat-test-key";
+
   private KeyPair keyPair;
   private WireMockServer webwolfServer;
   private int port;
@@ -53,26 +59,39 @@ class JWTHeaderJKUEndpointTest extends LessonTest {
     return keyPairGenerator.generateKeyPair();
   }
 
+  @AfterEach
+  void stopWebWolf() {
+    webwolfServer.stop();
+  }
+
   @Test
-  void solve() throws Exception {
+  void attackerControlledJkuIsRejectedWithoutNetworkAccess() throws Exception {
     setupJsonWebKeySetInWebWolf();
     var token = createTokenAndSignIt();
 
     mockMvc
         .perform(MockMvcRequestBuilders.post("/JWT/jku/delete").param("token", token).content(""))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+
+    webwolfServer.verify(0, WireMock.getRequestedFor(WireMock.urlEqualTo("/files/jwks")));
+  }
+
+  @Test
+  void trustedJwksTokenCanBeVerified() throws Exception {
+    setupJsonWebKeySetInWebWolf();
+    var endpoint = new JWTHeaderJKUEndpoint(trustedJwksUrl());
+
+    assertThat(endpoint.deleteAccount(createTokenAndSignIt()).assignmentSolved()).isTrue();
   }
 
   @Test
   @DisplayName("When JWKS is not present in WebWolf then the call should fail")
   void shouldFailNotPresent() throws Exception {
     var token = createTokenAndSignIt();
+    var endpoint = new JWTHeaderJKUEndpoint(trustedJwksUrl());
 
-    mockMvc
-        .perform(MockMvcRequestBuilders.post("/JWT/jku/delete").param("token", token).content(""))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+    assertThat(endpoint.deleteAccount(token).assignmentSolved()).isFalse();
   }
 
   private String createTokenAndSignIt() {
@@ -81,6 +100,7 @@ class JWTHeaderJKUEndpointTest extends LessonTest {
     var token =
         Jwts.builder()
             .setHeaderParam("jku", "http://localhost:%d/files/jwks".formatted(port))
+            .setHeaderParam("kid", KEY_ID)
             .setClaims(claims)
             .signWith(RS256, this.keyPair.getPrivate())
             .compact();
@@ -88,9 +108,15 @@ class JWTHeaderJKUEndpointTest extends LessonTest {
   }
 
   private void setupJsonWebKeySetInWebWolf() {
-    var jwks = new JsonWebKeySet(new RsaJsonWebKey((RSAPublicKey) keyPair.getPublic()));
+    var rsaJsonWebKey = new RsaJsonWebKey((RSAPublicKey) keyPair.getPublic());
+    rsaJsonWebKey.setKeyId(KEY_ID);
+    var jwks = new JsonWebKeySet(rsaJsonWebKey);
     webwolfServer.stubFor(
         WireMock.get(WireMock.urlMatching("/files/jwks"))
             .willReturn(aResponse().withStatus(200).withBody(jwks.toJson())));
+  }
+
+  private URL trustedJwksUrl() throws Exception {
+    return URI.create("http://localhost:%d/files/jwks".formatted(port)).toURL();
   }
 }
