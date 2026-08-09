@@ -6,6 +6,7 @@ package org.owasp.webgoat.lessons.sqlinjection.mitigation;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 
+import java.util.regex.Pattern;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @AssignmentHints(
     value = {"SqlOnlyInputValidation-1", "SqlOnlyInputValidation-2", "SqlOnlyInputValidation-3"})
 public class SqlOnlyInputValidation implements AssignmentEndpoint {
+  private static final Pattern USER_ID = Pattern.compile("[A-Za-z][A-Za-z '-]{0,63}");
 
   private final SqlInjectionLesson6a lesson6a;
 
@@ -29,7 +31,7 @@ public class SqlOnlyInputValidation implements AssignmentEndpoint {
   @PostMapping("/SqlOnlyInputValidation/attack")
   @ResponseBody
   public AttackResult attack(@RequestParam("userid_sql_only_input_validation") String userId) {
-    if (userId.contains(" ")) {
+    if (!USER_ID.matcher(userId).matches()) {
       return failed(this).feedback("SqlOnlyInputValidation-failed").build();
     }
     AttackResult attackResult = lesson6a.injectableQuery(userId);
