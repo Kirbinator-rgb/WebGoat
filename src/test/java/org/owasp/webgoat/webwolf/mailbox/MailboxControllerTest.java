@@ -6,6 +6,8 @@ package org.owasp.webgoat.webwolf.mailbox;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -21,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.owasp.webgoat.server.WebWolfMailToken;
 import org.owasp.webgoat.webwolf.WebSecurityConfig;
 import org.owasp.webgoat.webwolf.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +41,7 @@ public class MailboxControllerTest {
 
   @Autowired private MockMvc mvc;
   @MockBean private MailboxRepository mailbox;
+  @MockBean private WebWolfMailToken mailToken;
 
   @MockBean private ClientRegistrationRepository clientRegistrationRepository;
   @MockBean private UserService userService;
@@ -49,6 +53,7 @@ public class MailboxControllerTest {
   @BeforeEach
   public void setup() {
     objectMapper.addMixIn(Email.class, EmailMixIn.class);
+    Mockito.when(mailToken.value()).thenReturn("test-mail-token");
   }
 
   @Test
@@ -65,9 +70,30 @@ public class MailboxControllerTest {
         .perform(
             post("/mail")
                 .with(csrf())
+                .header(WebWolfMailToken.HEADER_NAME, "test-mail-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsBytes(email)))
         .andExpect(status().isCreated());
+  }
+
+  @Test
+  public void anonymousSendersCannotForgeMail() throws Exception {
+    Email email =
+        Email.builder()
+            .contents("Forged reset message")
+            .recipient("victim")
+            .sender("attacker@example.org")
+            .title("Reset your password")
+            .build();
+
+    this.mvc
+        .perform(
+            post("/mail")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(email)))
+        .andExpect(status().isForbidden());
+    verify(mailbox, never()).save(Mockito.any());
   }
 
   @Test

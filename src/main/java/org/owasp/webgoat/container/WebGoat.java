@@ -6,6 +6,8 @@ package org.owasp.webgoat.container;
 
 import java.io.File;
 import org.owasp.webgoat.container.session.LessonSession;
+import org.owasp.webgoat.server.WebWolfMailToken;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
@@ -38,7 +40,20 @@ public class WebGoat {
   }
 
   @Bean
-  public RestTemplate restTemplate() {
-    return new RestTemplate();
+  public RestTemplate restTemplate(
+      @Value("${webwolf.mail.url}") String webWolfMailUrl,
+      ObjectProvider<WebWolfMailToken> mailTokenProvider) {
+    WebWolfMailToken mailToken = mailTokenProvider.getIfAvailable(WebWolfMailToken::create);
+    RestTemplate restTemplate = new RestTemplate();
+    restTemplate
+        .getInterceptors()
+        .add(
+            (request, body, execution) -> {
+              if (webWolfMailUrl.equals(request.getURI().toString())) {
+                request.getHeaders().set(WebWolfMailToken.HEADER_NAME, mailToken.value());
+              }
+              return execution.execute(request, body);
+            });
+    return restTemplate;
   }
 }
