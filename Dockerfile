@@ -36,5 +36,6 @@ ENTRYPOINT [ "java", \
    "-Drunning.in.docker=true", \
    "-jar", "webgoat.jar", "--server.address", "0.0.0.0" ]
 
-HEALTHCHECK --interval=5s --timeout=3s \
-  CMD curl --fail http://localhost:8080/WebGoat/actuator/health || exit 1
+HEALTHCHECK --interval=5s --timeout=3s --start-period=60s --retries=12 \
+  CMD wget --quiet --tries=1 --output-document=/dev/null \
+    http://localhost:8080/WebGoat/actuator/health || exit 1
