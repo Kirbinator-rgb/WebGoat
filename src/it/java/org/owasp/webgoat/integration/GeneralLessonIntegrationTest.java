@@ -136,8 +136,8 @@ public class GeneralLessonIntegrationTest extends IntegrationTest {
 
     startLesson("AuthBypass");
     params.clear();
-    params.put("secQuestion2", "John");
-    params.put("secQuestion3", "Main");
+    params.put("secQuestion0", "Dr. Watson");
+    params.put("secQuestion1", "Baker Street");
     params.put("jsEnabled", "1");
     params.put("verifyMethod", "SEC_QUESTIONS");
     params.put("userId", "12309746");
@@ -202,8 +202,8 @@ public class GeneralLessonIntegrationTest extends IntegrationTest {
     startLesson("AuthBypass");
     Map<String, Object> params = new HashMap<>();
     params.clear();
-    params.put("secQuestion2", "John");
-    params.put("secQuestion3", "Main");
+    params.put("secQuestion0", "Dr. Watson");
+    params.put("secQuestion1", "Baker Street");
     params.put("jsEnabled", "1");
     params.put("verifyMethod", "SEC_QUESTIONS");
     params.put("userId", "12309746");

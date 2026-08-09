@@ -4,77 +4,40 @@
  */
 package org.owasp.webgoat.lessons.authbypass;
 
-import java.util.HashMap;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Map;
 
 /** Created by appsec on 7/18/17. */
 public class AccountVerificationHelper {
 
   // simulating database storage of verification credentials
-  private static final Integer verifyUserId = 1223445;
-  private static final Map<String, String> userSecQuestions = new HashMap<>();
-
-  static {
-    userSecQuestions.put("secQuestion0", "Dr. Watson");
-    userSecQuestions.put("secQuestion1", "Baker Street");
-  }
-
-  private static final Map<Integer, Map> secQuestionStore = new HashMap<>();
-
-  static {
-    secQuestionStore.put(verifyUserId, userSecQuestions);
-  }
+  private static final Integer VERIFY_USER_ID = 12309746;
+  private static final Map<String, String> USER_SECURITY_QUESTIONS =
+      Map.of("secQuestion0", "Dr. Watson", "secQuestion1", "Baker Street");
+  private static final Map<Integer, Map<String, String>> SECURITY_QUESTION_STORE =
+      Map.of(VERIFY_USER_ID, USER_SECURITY_QUESTIONS);
 
   // end 'data store set up'
 
-  // this is to aid feedback in the attack process and is not intended to be part of the
-  // 'vulnerable' code
-  public boolean didUserLikelylCheat(HashMap<String, String> submittedAnswers) {
-    boolean likely = false;
-
-    if (submittedAnswers.size() == secQuestionStore.get(verifyUserId).size()) {
-      likely = true;
+  public boolean verifyAccount(Integer userId, Map<String, String> submittedQuestions) {
+    Map<String, String> expectedQuestions = SECURITY_QUESTION_STORE.get(userId);
+    if (expectedQuestions == null || !submittedQuestions.keySet().equals(expectedQuestions.keySet())) {
+      return false;
     }
 
-    if ((submittedAnswers.containsKey("secQuestion0")
-            && submittedAnswers
-                .get("secQuestion0")
-                .equals(secQuestionStore.get(verifyUserId).get("secQuestion0")))
-        && (submittedAnswers.containsKey("secQuestion1")
-            && submittedAnswers
-                .get("secQuestion1")
-                .equals(secQuestionStore.get(verifyUserId).get("secQuestion1")))) {
-      likely = true;
-    } else {
-      likely = false;
+    // ASVS V6.3: every required authentication answer must match; missing fields fail closed.
+    boolean allAnswersMatch = true;
+    for (Map.Entry<String, String> question : expectedQuestions.entrySet()) {
+      allAnswersMatch &=
+          constantTimeEquals(question.getValue(), submittedQuestions.get(question.getKey()));
     }
-
-    return likely;
+    return allAnswersMatch;
   }
 
-  // end of cheating check ... the method below is the one of real interest. Can you find the flaw?
-
-  public boolean verifyAccount(Integer userId, HashMap<String, String> submittedQuestions) {
-    // short circuit if no questions are submitted
-    if (submittedQuestions.entrySet().size() != secQuestionStore.get(verifyUserId).size()) {
-      return false;
-    }
-
-    if (submittedQuestions.containsKey("secQuestion0")
-        && !submittedQuestions
-            .get("secQuestion0")
-            .equals(secQuestionStore.get(verifyUserId).get("secQuestion0"))) {
-      return false;
-    }
-
-    if (submittedQuestions.containsKey("secQuestion1")
-        && !submittedQuestions
-            .get("secQuestion1")
-            .equals(secQuestionStore.get(verifyUserId).get("secQuestion1"))) {
-      return false;
-    }
-
-    // else
-    return true;
+  private boolean constantTimeEquals(String expected, String submitted) {
+    return submitted != null
+        && MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.UTF_8), submitted.getBytes(StandardCharsets.UTF_8));
   }
 }
