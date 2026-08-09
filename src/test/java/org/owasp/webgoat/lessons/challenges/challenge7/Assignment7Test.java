@@ -19,6 +19,7 @@ import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.owasp.webgoat.WithWebGoatUser;
 import org.owasp.webgoat.container.plugins.LessonTest;
 import org.owasp.webgoat.lessons.challenges.Email;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,6 +54,7 @@ class Assignment7Test extends LessonTest {
   }
 
   @Test
+  @WithWebGoatUser(username = "admin")
   @DisplayName("Issued admin reset links are random and single-use")
   void issuedAdminResetLinkIsRandomAndSingleUse() throws Exception {
     ResultActions result =
@@ -73,6 +75,19 @@ class Assignment7Test extends LessonTest {
     mockMvc
         .perform(MockMvcRequestBuilders.get(RESET_PASSWORD_PATH + "/" + resetLink))
         .andExpect(status().is(equalTo(HttpStatus.I_AM_A_TEAPOT.value())));
+  }
+
+  @Test
+  @DisplayName("A user cannot request an administrator reset link")
+  void cannotRequestAnotherAccountsResetLink() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post(CHALLENGE_PATH)
+                .param("email", "admin@webgoat-cloud.net"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+
+    verify(restTemplate, never()).postForEntity(eq(webWolfMailURL), any(), eq(Object.class));
   }
 
   @Test

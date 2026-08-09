@@ -4,6 +4,7 @@
  */
 package org.owasp.webgoat.lessons.challenges.challenge7;
 
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.time.Duration;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.owasp.webgoat.lessons.challenges.Email;
@@ -69,7 +71,8 @@ public class Assignment7 implements AssignmentEndpoint {
   }
 
   @GetMapping("/challenge/7/reset-password/{link}")
-  public ResponseEntity<String> resetPassword(@PathVariable(value = "link") String link) {
+  public ResponseEntity<String> resetPassword(
+      @PathVariable(value = "link") String link, @CurrentUsername String requester) {
     // ASVS V6.3: reset links are bounded, expiring, single-use credentials.
     PendingReset pendingReset =
         StringUtils.hasText(link) && link.length() <= MAX_RESET_LINK_LENGTH
@@ -77,6 +80,8 @@ public class Assignment7 implements AssignmentEndpoint {
             : null;
     if (pendingReset != null
         && pendingReset.expiresAt().isAfter(Instant.now())
+        && pendingReset.requestedBy().equalsIgnoreCase(requester)
+        && pendingReset.username().equalsIgnoreCase(requester)
         && pendingReset.username().equalsIgnoreCase("admin")) {
       return ResponseEntity.accepted()
           .body(
@@ -91,25 +96,28 @@ public class Assignment7 implements AssignmentEndpoint {
 
   @PostMapping("/challenge/7")
   @ResponseBody
-  public AttackResult sendPasswordResetLink(@RequestParam String email) {
+  public AttackResult sendPasswordResetLink(
+      @RequestParam String email, @CurrentUsername String requester) {
     String username = extractUsername(email);
-    if (username != null) {
-      String resetLink = passwordResetLink.createPasswordReset();
-      pendingResets.put(resetLink, new PendingReset(username, Instant.now().plus(RESET_LINK_TTL)));
-      try {
-        Email mail =
-            Email.builder()
-                .title("Your password reset link for challenge 7")
-                .contents(String.format(TEMPLATE, webGoatUrl, resetLink))
-                .sender("password-reset@webgoat-cloud.net")
-                .recipient(username)
-                .time(LocalDateTime.now())
-                .build();
-        restTemplate.postForEntity(webWolfMailURL, mail, Object.class);
-      } catch (RuntimeException exception) {
-        pendingResets.remove(resetLink);
-        log.warn("Unable to deliver challenge 7 password reset email");
-      }
+    if (username == null || !username.equalsIgnoreCase(requester)) {
+      return failed(this).feedback("email.send").feedbackArgs(email).build();
+    }
+    String resetLink = passwordResetLink.createPasswordReset();
+    pendingResets.put(
+        resetLink, new PendingReset(username, requester, Instant.now().plus(RESET_LINK_TTL)));
+    try {
+      Email mail =
+          Email.builder()
+              .title("Your password reset link for challenge 7")
+              .contents(String.format(TEMPLATE, webGoatUrl, resetLink))
+              .sender("password-reset@webgoat-cloud.net")
+              .recipient(username)
+              .time(LocalDateTime.now())
+              .build();
+      restTemplate.postForEntity(webWolfMailURL, mail, Object.class);
+    } catch (RuntimeException exception) {
+      pendingResets.remove(resetLink);
+      log.warn("Unable to deliver challenge 7 password reset email");
     }
     return success(this).feedback("email.send").feedbackArgs(email).build();
   }
@@ -126,5 +134,5 @@ public class Assignment7 implements AssignmentEndpoint {
     return username.length() <= 64 ? username : null;
   }
 
-  private record PendingReset(String username, Instant expiresAt) {}
+  private record PendingReset(String username, String requestedBy, Instant expiresAt) {}
 }
