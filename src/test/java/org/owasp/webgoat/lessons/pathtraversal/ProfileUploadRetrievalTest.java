@@ -6,8 +6,10 @@ package org.owasp.webgoat.lessons.pathtraversal;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.net.URI;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.WithWebGoatUser;
 import org.owasp.webgoat.container.plugins.LessonTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.token.Sha512DigestUtils;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @WithWebGoatUser
@@ -63,5 +66,15 @@ class ProfileUploadRetrievalTest extends LessonTest {
         .perform(get("/PathTraversal/random-picture?id=test"))
         .andExpect(status().isBadRequest())
         .andExpect(content().string("Invalid picture id"));
+  }
+
+  @Test
+  void publiclyDerivableUsernameHashCannotCompleteAssignment() throws Exception {
+    mockMvc
+        .perform(
+            post("/PathTraversal/random")
+                .param("secret", Sha512DigestUtils.shaHex("test")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted").value(false));
   }
 }
