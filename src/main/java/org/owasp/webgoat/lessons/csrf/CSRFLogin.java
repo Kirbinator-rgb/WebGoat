@@ -12,6 +12,7 @@ import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,8 +24,12 @@ public class CSRFLogin implements AssignmentEndpoint {
       path = "/csrf/login",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult completed(@CurrentUsername String username) {
-    if (username.startsWith("csrf")) {
+  public AttackResult completed(
+      @CurrentUsername String username,
+      @RequestHeader(value = "X-Requested-With", required = false) String requestVerification) {
+    if ("XMLHttpRequest".equals(requestVerification)
+        && username != null
+        && username.startsWith("csrf")) {
       return success(this).feedback("csrf-login-success").build();
     }
     return failed(this).feedback("csrf-login-failed").feedbackArgs(username).build();
