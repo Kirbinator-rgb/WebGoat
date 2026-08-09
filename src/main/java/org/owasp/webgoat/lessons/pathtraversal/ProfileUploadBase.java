@@ -12,6 +12,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
@@ -62,6 +64,34 @@ public class ProfileUploadBase implements AssignmentEndpoint {
 
     } catch (IOException e) {
       return failed(this).output(e.getMessage()).build();
+    }
+  }
+
+  protected AttackResult executeWithSafeFileName(
+      MultipartFile file, String fullName, String username) {
+    if (!isSafeFileName(fullName)) {
+      return failed(this).feedback("path-traversal-profile-attempt").build();
+    }
+    return execute(file, fullName, username);
+  }
+
+  private boolean isSafeFileName(String fileName) {
+    if (fileName == null
+        || fileName.isBlank()
+        || fileName.length() > 128
+        || fileName.indexOf('/') >= 0
+        || fileName.indexOf('\\') >= 0) {
+      return false;
+    }
+    try {
+      Path path = Path.of(fileName);
+      // ASVS V5.3: accept a single relative leaf name, never a client-selected path.
+      return !path.isAbsolute()
+          && path.getNameCount() == 1
+          && !".".equals(fileName)
+          && !"..".equals(fileName);
+    } catch (InvalidPathException e) {
+      return false;
     }
   }
 

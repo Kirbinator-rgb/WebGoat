@@ -40,7 +40,7 @@ public class ProfileUpload extends ProfileUploadBase {
       @RequestParam("uploadedFile") MultipartFile file,
       @RequestParam(value = "fullName", required = false) String fullName,
       @CurrentUsername String username) {
-    return super.execute(file, fullName, username);
+    return super.executeWithSafeFileName(file, fullName, username);
   }
 
   @GetMapping("/PathTraversal/profile-picture")
