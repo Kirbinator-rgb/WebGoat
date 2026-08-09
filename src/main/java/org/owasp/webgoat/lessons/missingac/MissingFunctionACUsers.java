@@ -13,6 +13,7 @@ import org.owasp.webgoat.container.CurrentUsername;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -53,13 +54,27 @@ public class MissingFunctionACUsers {
       consumes = "application/json",
       produces = "application/json")
   @ResponseBody
-  public User addUser(@RequestBody User newUser) {
+  public ResponseEntity<User> addUser(
+      @RequestBody User newUser, @CurrentUsername String currentUsername) {
+    User currentUser = userRepository.findByUsername(currentUsername);
+    if (currentUser == null || !currentUser.isAdmin()) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+    if (!StringUtils.hasText(newUser.getUsername())
+        || newUser.getUsername().length() > 64
+        || !StringUtils.hasText(newUser.getPassword())
+        || newUser.getPassword().length() > 128) {
+      return ResponseEntity.badRequest().build();
+    }
+
     try {
-      userRepository.save(newUser);
-      return newUser;
+      // ASVS V4.1/V5.1: authorize the operation and ignore client-supplied privilege fields.
+      User allowedUser = new User(newUser.getUsername(), newUser.getPassword(), false);
+      userRepository.save(allowedUser);
+      return ResponseEntity.ok(allowedUser);
     } catch (Exception ex) {
       log.error("Error creating new User", ex);
-      return null;
+      return ResponseEntity.internalServerError().build();
     }
 
     // @RequestMapping(path = {"user/{username}","/"}, method = RequestMethod.DELETE, consumes =

@@ -33,7 +33,7 @@ class MissingFunctionACUsersTest extends LessonTest {
   }
 
   @Test
-  void addUser() throws Exception {
+  void regularUserCannotSelfRegisterAsAdmin() throws Exception {
     var user =
         """
         {"username":"newUser","password":"newUser12","admin": "true"}
@@ -43,7 +43,7 @@ class MissingFunctionACUsersTest extends LessonTest {
             MockMvcRequestBuilders.post("/access-control/users")
                 .header("Content-type", "application/json")
                 .content(user))
-        .andExpect(status().isOk());
-
+        .andExpect(status().isForbidden());
   }
+
 }

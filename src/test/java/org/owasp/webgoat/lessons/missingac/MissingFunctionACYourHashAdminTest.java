@@ -23,7 +23,7 @@ class MissingFunctionACYourHashAdminTest extends LessonTest {
   }
 
   @Test
-  void solve() throws Exception {
+  void regularUserCannotSubmitLeakedAdminHash() throws Exception {
     var userHash =
         new DisplayUser(new User("Jerry", "doesnotreallymatter", true), PASSWORD_SALT_ADMIN)
             .getUserHash();
@@ -32,12 +32,7 @@ class MissingFunctionACYourHashAdminTest extends LessonTest {
             MockMvcRequestBuilders.post("/access-control/user-hash-fix")
                 .param("userHash", userHash))
         .andExpect(status().isOk())
-        .andExpect(
-            jsonPath(
-                "$.feedback",
-                CoreMatchers.containsString(
-                    "Congrats! You really succeeded when you added the user.")))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
