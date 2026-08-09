@@ -26,17 +26,27 @@ public class SSRFTest2 extends LessonTest {
   }
 
   @Test
-  public void modifyUrlIfconfigPro() throws Exception {
+  public void rejectsExternalUrl() throws Exception {
     mockMvc
         .perform(MockMvcRequestBuilders.post("/SSRF/task2").param("url", "http://ifconfig.pro"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test
   public void modifyUrlCat() throws Exception {
     mockMvc
         .perform(MockMvcRequestBuilders.post("/SSRF/task2").param("url", "images/cat.jpg"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+  }
+
+  @Test
+  public void rejectsInternalMetadataUrl() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/SSRF/task2")
+                .param("url", "http://169.254.169.254/latest/meta-data/"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
