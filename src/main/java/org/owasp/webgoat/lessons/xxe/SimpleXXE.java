@@ -9,8 +9,10 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 import static org.springframework.http.MediaType.ALL_VALUE;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
+import jakarta.xml.bind.JAXBException;
+import javax.xml.stream.XMLStreamException;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.exec.OS;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.owasp.webgoat.container.CurrentUser;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @AssignmentHints({
   "xxe.hints.simple.xxe.1",
@@ -49,17 +52,16 @@ public class SimpleXXE implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult createNewComment(
       @RequestBody String commentStr, @CurrentUser WebGoatUser user) {
-    String error = "";
     try {
-      var comment = comments.parseXml(commentStr, false);
+      var comment = comments.parseXml(commentStr, true);
       comments.addComment(comment, user, false);
       if (checkSolution(comment)) {
         return success(this).build();
       }
-    } catch (Exception e) {
-      error = ExceptionUtils.getStackTrace(e);
+    } catch (XMLStreamException | JAXBException e) {
+      log.warn("Rejected invalid XML comment: {}", e.getClass().getSimpleName());
     }
-    return failed(this).output(error).build();
+    return failed(this).build();
   }
 
   private boolean checkSolution(Comment comment) {
